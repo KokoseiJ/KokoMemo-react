@@ -26,7 +26,9 @@ function wipeToken() {
 
 
 function getUserInfo() {
-  return request("get", "/user/info").then(resp => resp.data.data)
+  return request("get", "/user/info").then(
+    resp => resp.data.data,
+    error => {console.error("getUserInfo failed", error); throw error;})
 }
 
 
@@ -40,7 +42,7 @@ function refresh() {
       return data
     },
     error => {
-      console.error("refresh failed");
+      console.error("refresh failed", error);
       alert("You have been logged out, plaese sign in again.")
       wipeToken();
       setUser(null);
@@ -60,13 +62,15 @@ function request(method, path, data) {
   }).then(
     respData => respData,
     error => {
+      console.error("request failed", error)
       if (error.response && error.response.status == 401) {
         console.log("AT invalid, trying refresh");
         return refresh().then(
           ()=>{
             console.log("refresh successful, retrying request");
-            request(method, path, data);
-          }
+            return request(method, path, data);
+          },
+          (error) => {console.log("gay", error); throw error;}
         );
       }
       throw error;
@@ -114,6 +118,8 @@ function NavbarUserSection({user, setUser}) {
           setUser(data);
           setModalState(false);
           return data;
+        }, error => {
+          console.error("login failed", error)
         });
       }
     );
@@ -121,6 +127,7 @@ function NavbarUserSection({user, setUser}) {
 
   function handleLogout() {
     return request("get", "/user/login/logout").then(() => {
+      console.log("Bye.")
       wipeToken();
       setUser(null);
     })
@@ -160,7 +167,7 @@ function App() {
         console.log("meow");
       },
       error => {
-        console.error("Stored session is invalid");
+        console.error("Stored session is invalid", error);
         wipeToken();
       }
     );
@@ -187,6 +194,7 @@ function App() {
         </section> :
         <section className="container hero is-fullheight-with-navbar">
           <h1 className="title">You've entered the secret society of the pigeon milkers</h1>
+          <p>{JSON.stringify(user)}</p>
         </section>
       }
     </>
