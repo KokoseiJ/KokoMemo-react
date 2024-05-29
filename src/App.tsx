@@ -9,9 +9,11 @@ const client = axios.create({
   baseURL: API_HOST
 });
 
+let user, setUser;
+
 
 function handleToken(at, rt) {
-  console.log(at, rt)
+  console.log("handleToken", at, rt)
   localStorage.setItem("at", at);
   localStorage.setItem("rt", rt);
 }
@@ -23,14 +25,26 @@ function wipeToken() {
 }
 
 
+function getUserInfo() {
+  return request("get", "/user/info").then(resp => resp.data.data)
+}
+
+
 function refresh() {
-  let rt = localStorage.getItem("rt");
+  const rt = localStorage.getItem("rt");
 
   return client.post("/user/login/token/refresh", {token: rt}).then(
     respData => {
       let data = respData.data.data
       handleToken(data.access_token, data.refresh_token)
       return data
+    },
+    error => {
+      console.error("refresh failed");
+      alert("You have been logged out, plaese sign in again.")
+      wipeToken();
+      setUser(null);
+      throw error;
     }
   )
 }
@@ -49,10 +63,9 @@ function request(method, path, data) {
       if (error.response && error.response.status == 401) {
         console.log("AT invalid, trying refresh");
         return refresh().then(
-          ()=>request(method, path, data),
-          error => {
-            console.error("refresh failed");
-            throw error;
+          ()=>{
+            console.log("refresh successful, retrying request");
+            request(method, path, data);
           }
         );
       }
@@ -97,8 +110,7 @@ function NavbarUserSection({user, setUser}) {
       authResp => {
         let data = authResp.data.data;
         handleToken(data.access_token, data.refresh_token);
-        return request("get", "/user/info").then(resp => {
-          let data = resp.data.data;
+        return getUserInfo().then(data => {
           setUser(data);
           setModalState(false);
           return data;
@@ -108,7 +120,7 @@ function NavbarUserSection({user, setUser}) {
   }
 
   function handleLogout() {
-    return request("get", "/user/login/logout").finally(() => {
+    return request("get", "/user/login/logout").then(() => {
       wipeToken();
       setUser(null);
     })
@@ -133,7 +145,26 @@ function NavbarUserSection({user, setUser}) {
 
 
 function App() {
-  const [user, setUser] = useState(null);
+  [user, setUser] = useState(null);
+  console.log("rendering user", user);
+
+  let at = localStorage.getItem("at");
+  let rt = localStorage.getItem("rt");
+
+  if (user === null && at !== null) {
+    console.log(user, at)
+    handleToken(at, rt);
+    getUserInfo().then(
+      data => {
+        setUser(data);
+        console.log("meow");
+      },
+      error => {
+        console.error("Stored session is invalid");
+        wipeToken();
+      }
+    );
+  }
 
   return (
     <>
@@ -162,4 +193,4 @@ function App() {
   )
 }
 
-export default App
+export default App;
