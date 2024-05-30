@@ -36,7 +36,7 @@ interface Memo {
 }
 
 
-const API_HOST = "http://localhost:8000/api/v1"
+const API_HOST = "https://api.kokoseij.xyz/kokomemo/api/v1"
 
 const client = axios.create({
   baseURL: API_HOST
