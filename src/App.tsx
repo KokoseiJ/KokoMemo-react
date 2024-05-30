@@ -38,7 +38,8 @@ function getUserInfo() {
 function refresh() {
   const rt = localStorage.getItem("rt");
   
-  if (currentTokenRefresh !== null) return Promise(currentTokenRefresh);
+  if (currentTokenRefresh !== null)
+    return Promise.resolve(currentTokenRefresh);
 
   currentTokenRefresh = client.post(
     "/user/login/token/refresh", {token: rt}
