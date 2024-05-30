@@ -1,8 +1,40 @@
-import { useState, useEffect, createRef } from 'react'
+import { useState, useEffect } from 'react'
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google'
-import axios from 'axios'
+import axios, { AxiosResponse } from 'axios'
 import bulmaCollapsible from '@creativebulma/bulma-collapsible';
 import './kokomemo-bulma.scss'
+
+interface Props {[key:string]: any}
+
+
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  used_bytes: number;
+  created_at: Date;
+  integrations: Array<{service: string;}>;
+}
+
+
+interface Wall {
+  id: string;
+  name: string;
+  colour: number;
+  created_at: Date;
+  modified_at: Date;
+}
+
+
+interface Memo {
+  id: string;
+  user_id: string;
+  wall_id: string;
+  content: string;
+  created_at: Date;
+  modified_at: Date;
+}
+
 
 const API_HOST = "http://localhost:8000/api/v1"
 
@@ -10,12 +42,13 @@ const client = axios.create({
   baseURL: API_HOST
 });
 
-let user, setUser;
+let user: User | null;
+let setUser: Function;
 
-let currentTokenRefresh = null;
+let currentTokenRefresh: Promise<object> | null = null;
 
 
-function handleToken(at, rt) {
+function handleToken(at: string, rt: string) {
   console.log("handleToken", at, rt)
   localStorage.setItem("at", at);
   localStorage.setItem("rt", rt);
@@ -30,12 +63,12 @@ function wipeToken() {
 
 function getUserInfo() {
   return request("get", "/user/info").then(
-    resp => resp.data.data,
-    error => {console.error("getUserInfo failed", error); throw error;})
+    (resp: AxiosResponse) => resp.data.data
+  )
 }
 
 
-function refresh() {
+function refresh(): Promise<object> {
   const rt = localStorage.getItem("rt");
   
   if (currentTokenRefresh !== null)
@@ -60,7 +93,7 @@ function refresh() {
 }
 
 
-function request(method, path, data) {
+function request(method: string, path: string, data: object | null = null): Promise<AxiosResponse> {
   let at = localStorage.getItem("at")
   return client.request({
     url: path,
@@ -87,7 +120,7 @@ function request(method, path, data) {
 }
 
 
-function LoginModal({setModalState, handleLogin}) {
+function LoginModal({setModalState, handleLogin}:Props) {
   return (
     <GoogleOAuthProvider clientId="147032281417-7ia4o5rajlj8or5rh8uu1j59ud805k62.apps.googleusercontent.com">
       <div className="modal is-active">
@@ -114,11 +147,11 @@ function LoginModal({setModalState, handleLogin}) {
 }
 
 
-function NavbarUserSection({user, setUser}) {
+function NavbarUserSection({user, setUser}:Props) {
   const [modalState, setModalState] = useState(false);
 
-  function handleLogin(service, data) {
-    return client.post(`/user/login/${service}`, data).then(authResp => {
+  function handleLogin(service: string, payload: object) {
+    return client.post(`/user/login/${service}`, payload).then(authResp => {
       let data = authResp.data.data;
       handleToken(data.access_token, data.refresh_token);
       return getUserInfo().then(data => {
@@ -173,9 +206,10 @@ function NotLoggedInHome() {
 }
 
 
-function EditMemoModal({id, wallId, content, setContent, setIsDeleted, setModalState}) {
-  function handleSubmit(event) {
-    const submitter = event.nativeEvent.submitter.name;
+function EditMemoModal({id, wallId, content, setContent, setIsDeleted, setModalState}: Props) {
+  function handleSubmit(event: any) {
+    const submitterElement = event.nativeEvent.submitter;
+    const submitter = submitterElement !== null ? submitterElement.name : "error";
     const content = event.target.content.value
 
     event.preventDefault();
@@ -184,12 +218,12 @@ function EditMemoModal({id, wallId, content, setContent, setIsDeleted, setModalS
       request("put", `/walls/${wallId}/memos`, {
         id: id,
         content: content
-      }).then(resp => {
+      }).then(() => {
         setContent(content);
         setModalState(false);
       });
     } else if (submitter == "delete") {
-      request("delete", `/walls/${wallId}/memos/${id}`).then(resp => {
+      request("delete", `/walls/${wallId}/memos/${id}`).then(() => {
         setIsDeleted(true);
         setModalState(false);
       });
@@ -206,7 +240,7 @@ function EditMemoModal({id, wallId, content, setContent, setIsDeleted, setModalS
             <label className="label">Content</label>
             <textarea className="textarea" name="content"
                       defaultValue={content}
-                      rows="15" style={{backgroundColor: "#feff9c", color: "#000000"}}> 
+                      rows={15} style={{backgroundColor: "#feff9c", color: "#000000"}}> 
             </textarea>
           </div>
           <div className="field is-grouped is-flex is-justify-content-flex-end">
@@ -220,12 +254,12 @@ function EditMemoModal({id, wallId, content, setContent, setIsDeleted, setModalS
 }
 
 
-function Memo({id, wallId, initialContent}) {
+function Memo({id, wallId, initialContent}: Props) {
   const [modalState, setModalState] = useState(false);
   const [isDeleted, setIsDeleted] = useState(false);
   const [content, setContent] = useState(initialContent);
 
-  const hook = (meow) => {
+  const hook = (meow: any) => {
     console.log("AGGA", meow);
     setModalState(meow);
   }
@@ -251,8 +285,8 @@ function Memo({id, wallId, initialContent}) {
 }
 
 
-function NewMemoModal({wallId, setMemos, setModalState}) {
-  function handleSubmit(event) {
+function NewMemoModal({wallId, setMemos, setModalState}: Props) {
+  function handleSubmit(event: any) {
     const content = event.target.content.value
 
     event.preventDefault();
@@ -261,7 +295,7 @@ function NewMemoModal({wallId, setMemos, setModalState}) {
       content: content
     }).then(resp => {
       const newMemo = resp.data.data;
-      setMemos(memos => [newMemo, ...memos]);
+      setMemos((memos: Array<Memo>) => [newMemo, ...memos]);
       setModalState(false);
     });
   }
@@ -276,7 +310,7 @@ function NewMemoModal({wallId, setMemos, setModalState}) {
             <label className="label">Content</label>
             <textarea className="textarea" name="content"
                       defaultValue="Write a simple memo like this is a sticky note!"
-                      rows="15" style={{backgroundColor: "#feff9c", color: "#000000"}}> 
+                      rows={15} style={{backgroundColor: "#feff9c", color: "#000000"}}> 
             </textarea>
           </div>
           <div className="field is-grouped is-flex is-justify-content-flex-end">
@@ -290,9 +324,9 @@ function NewMemoModal({wallId, setMemos, setModalState}) {
 
 
 function EditWallModal(
-  {id, setModalState, name, setName, colour, setColour, setIsDeleted}
+  {id, setModalState, name, setName, colour, setColour, setIsDeleted}: Props
 ) {
-  function handleSubmit(event) {
+  function handleSubmit(event: any) {
     const name = event.target.name.value
     const colour = event.target.colour.value
     const colourNum = Number(colour.replace("#", "0x"))
@@ -305,7 +339,7 @@ function EditWallModal(
         id: id,
         name: name,
         colour: colourNum
-      }).then(resp => {
+      }).then(() => {
         setName(name);
         setColour(colour);
         setModalState(false);
@@ -342,13 +376,13 @@ function EditWallModal(
 }
 
 
-function Wall({id, initialName, initialColour}) {
-  const [memos, setMemos] = useState(null);
+function Wall({id, initialName, initialColour}: Props) {
+  const [memos, setMemos] = useState<Array<Memo> | null>(null);
   const [name, setName] = useState(initialName);
   const [colour, setColour] = useState(
     `#${initialColour.toString(16).padStart(6, '0')}`
   )
-  const [instance, setInstance] = useState(null);
+  const [instance, setInstance] = useState<any>(null);
   const [wallModalState, setWallModalState] = useState(false);
   const [memoModalState, setMemoModalState] = useState(false);
   const [isDeleted, setIsDeleted] = useState(false);
@@ -356,12 +390,12 @@ function Wall({id, initialName, initialColour}) {
   useEffect(()=>{
     console.log("meow")
     if (instance === null) {
-      let instance = bulmaCollapsible.attach(`#collapsible-${id}`)[0]
-      setInstance(instance);
-      instance.on('after:expand', () => {
-        instance._originalHeight = instance.element.scrollHeight + 'px';
+      const newInstance: any = bulmaCollapsible.attach(`#collapsible-${id}`)[0]
+      setInstance(newInstance);
+      newInstance.on('after:expand', () => {
+        newInstance._originalHeight = newInstance.element.scrollHeight + 'px';
       })
-      console.log(instance)
+      console.log(newInstance)
     } else if (memoModalState == false) {
       console.log("modal closed");
       instance._originalHeight = instance.element.scrollHeight + 'px';
@@ -393,7 +427,7 @@ function Wall({id, initialName, initialColour}) {
           <button className="button is-primary is-fullwidth" onClick={()=>setMemoModalState(true)}>New memo</button>
         </div>
         { memos !== null ?
-          memos.map(memo =>
+          memos.map((memo: Memo) =>
             <Memo id={memo.id} wallId={id} initialContent={memo.content} key={memo.id}/>
           ) : "" 
         }
@@ -419,8 +453,8 @@ function Wall({id, initialName, initialColour}) {
 }
 
 
-function NewWallModal({setModalState, setWalls}) {
-  function handleSubmit(event) {
+function NewWallModal({setModalState, setWalls}: Props) {
+  function handleSubmit(event: any) {
     event.preventDefault()
     const name = event.target.name.value;
     const colour = Number(event.target.colour.value.replace("#", "0x"));
@@ -428,7 +462,7 @@ function NewWallModal({setModalState, setWalls}) {
     request("post", "/walls", {"name": name, "colour": colour}).then(resp => {
       const newWall = resp.data.data;
 
-      setWalls(walls=>[newWall, ...walls]);
+      setWalls((walls: Array<Wall>)=>[newWall, ...walls]);
       setModalState(false);
     });
   }
@@ -458,7 +492,7 @@ function NewWallModal({setModalState, setWalls}) {
 
 
 function MainHome() {
-  const [walls, setWalls] = useState(null);
+  const [walls, setWalls] = useState<Array<Wall> | null>(null);
   const [modalState, setModalState] = useState(false);
 
   if (walls === null) {
@@ -479,7 +513,7 @@ function MainHome() {
         </div>
       </div>
       { walls !== null ?
-        walls.map(wall =>
+        walls.map((wall: Wall) =>
           <Wall id={wall.id}
                 initialName={wall.name}
                 initialColour={wall.colour}
@@ -502,7 +536,7 @@ function App() {
   let at = localStorage.getItem("at");
   let rt = localStorage.getItem("rt");
 
-  if (user === null && at !== null) {
+  if (user === null && at !== null && rt !== null) {
     console.log(user, at)
     handleToken(at, rt);
     getUserInfo().then(
