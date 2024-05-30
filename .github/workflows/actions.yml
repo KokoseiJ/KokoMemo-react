@@ -12,6 +12,8 @@ jobs:
       - uses: actions/setup-node@v4
       - run: npm install
       - run: npm run build
+        env:
+          DEPLOY_URL: https://kokoseij.github.io/KokoMemo-react/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: ./dist
