@@ -1,7 +1,7 @@
-import { useState, createContext, useContext } from 'react'
+import { useState, useEffect, createRef } from 'react'
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google'
-import { ChromePicker } from 'react-color';
 import axios from 'axios'
+import bulmaCollapsible from '@creativebulma/bulma-collapsible';
 import './kokomemo-bulma.scss'
 
 const API_HOST = "http://localhost:8000/api/v1"
@@ -224,24 +224,29 @@ function Memo({id, wallId, initialContent}) {
   const [isDeleted, setIsDeleted] = useState(false);
   const [content, setContent] = useState(initialContent);
 
+  const hook = (meow) => {
+    console.log("AGGA", meow);
+    setModalState(meow);
+  }
+
   if (isDeleted) return (<></>);
 
-  return (
+  return (<>
     <div className="box" style={{backgroundColor: "#feff9c"}} onClick={()=>setModalState(true)}>
       <p style={{color: "#000000", whiteSpace: "pre-wrap"}}>
         {content}
       </p>
-      { modalState ?
-        <EditMemoModal id={id}
-                       wallId={wallId}
-                       content={content}
-                       setContent={setContent}
-                       setIsDeleted={setIsDeleted}
-                       setModalState={setModalState}/>
-        : ""
-      }
     </div>
-  )
+    { modalState ?
+      <EditMemoModal id={id}
+                     wallId={wallId}
+                     content={content}
+                     setContent={setContent}
+                     setIsDeleted={setIsDeleted}
+                     setModalState={hook}/>
+      : ""
+    }
+  </>)
 }
 
 
@@ -346,6 +351,13 @@ function Wall({id, initialName, initialColour}) {
   const [memoModalState, setMemoModalState] = useState(false);
   const [isDeleted, setIsDeleted] = useState(false);
 
+  useEffect(()=>{
+    const instance = bulmaCollapsible.attach(`#collapsible-${id}`)[0];
+    instance.on('after:expand', () => {
+      instance._originalHeight = instance.element.scrollHeight + 'px';
+    })
+  }, []);
+
   if (isDeleted) return (<></>);
 
   if (memos === null) {
@@ -356,7 +368,7 @@ function Wall({id, initialName, initialColour}) {
 
   return (
     <div className="box" style={{backgroundColor: colour}}>
-      <div className="is-flex is-justify-content-space-between">
+      <a href={`#collapsible-${id}`} data-action="collapse" className="is-flex is-justify-content-space-between">
         <button className="button is-invisible">Edit</button>
         <h1 className="title">{name}</h1>
         <div>
@@ -364,8 +376,8 @@ function Wall({id, initialName, initialColour}) {
             Edit
           </button>
         </div>
-      </div>
-      <div style={{marginRight: '33%', marginLeft: '33%'}}>
+      </a>
+      <div id={`collapsible-${id}`} className="is-collapsible" style={{marginRight: '33%', marginLeft: '33%'}}>
         <div className="block">
           <button className="button is-primary is-fullwidth" onClick={()=>setMemoModalState(true)}>New memo</button>
         </div>
