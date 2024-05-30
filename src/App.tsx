@@ -38,7 +38,7 @@ function getUserInfo() {
 function refresh() {
   const rt = localStorage.getItem("rt");
   
-  if (currentTokenRefresh !== null) return currentTokenRefresh;
+  if (currentTokenRefresh !== null) return Promise(currentTokenRefresh);
 
   currentTokenRefresh = client.post(
     "/user/login/token/refresh", {token: rt}
@@ -347,16 +347,26 @@ function Wall({id, initialName, initialColour}) {
   const [colour, setColour] = useState(
     `#${initialColour.toString(16).padStart(6, '0')}`
   )
+  const [instance, setInstance] = useState(null);
   const [wallModalState, setWallModalState] = useState(false);
   const [memoModalState, setMemoModalState] = useState(false);
   const [isDeleted, setIsDeleted] = useState(false);
 
   useEffect(()=>{
-    const instance = bulmaCollapsible.attach(`#collapsible-${id}`)[0];
-    instance.on('after:expand', () => {
+    console.log("meow")
+    if (instance === null) {
+      let instance = bulmaCollapsible.attach(`#collapsible-${id}`)[0]
+      setInstance(instance);
+      instance.on('after:expand', () => {
+        instance._originalHeight = instance.element.scrollHeight + 'px';
+      })
+      console.log(instance)
+    } else if (memoModalState == false) {
+      console.log("modal closed");
       instance._originalHeight = instance.element.scrollHeight + 'px';
-    })
-  }, []);
+      instance.element.style.height = instance.element.scrollHeight + 'px';
+    }
+  }, [memoModalState]);
 
   if (isDeleted) return (<></>);
 
