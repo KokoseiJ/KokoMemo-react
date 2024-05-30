@@ -1,5 +1,6 @@
 import { useState, createContext, useContext } from 'react'
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google'
+import { ChromePicker } from 'react-color';
 import axios from 'axios'
 import './kokomemo-bulma.scss'
 
@@ -10,6 +11,8 @@ const client = axios.create({
 });
 
 let user, setUser;
+
+let currentTokenRefresh = null;
 
 
 function handleToken(at, rt) {
@@ -34,21 +37,25 @@ function getUserInfo() {
 
 function refresh() {
   const rt = localStorage.getItem("rt");
+  
+  if (currentTokenRefresh !== null) return currentTokenRefresh;
 
-  return client.post("/user/login/token/refresh", {token: rt}).then(
-    respData => {
-      let data = respData.data.data
-      handleToken(data.access_token, data.refresh_token)
-      return data
-    },
-    error => {
-      console.error("refresh failed", error);
-      alert("You have been logged out, plaese sign in again.")
-      wipeToken();
-      setUser(null);
-      throw error;
-    }
-  )
+  currentTokenRefresh = client.post(
+    "/user/login/token/refresh", {token: rt}
+  ).then(respData => {
+    let data = respData.data.data
+    handleToken(data.access_token, data.refresh_token)
+    currentTokenRefresh = false;
+    return data
+  }, error => {
+    console.error("refresh failed", error);
+    alert("You have been logged out, plaese sign in again.")
+    wipeToken();
+    setUser(null);
+    throw error;
+  });
+
+  return currentTokenRefresh;
 }
 
 
@@ -110,19 +117,17 @@ function NavbarUserSection({user, setUser}) {
   const [modalState, setModalState] = useState(false);
 
   function handleLogin(service, data) {
-    return client.post(`/user/login/${service}`, data).then(
-      authResp => {
-        let data = authResp.data.data;
-        handleToken(data.access_token, data.refresh_token);
-        return getUserInfo().then(data => {
-          setUser(data);
-          setModalState(false);
-          return data;
-        }, error => {
-          console.error("login failed", error)
-        });
-      }
-    );
+    return client.post(`/user/login/${service}`, data).then(authResp => {
+      let data = authResp.data.data;
+      handleToken(data.access_token, data.refresh_token);
+      return getUserInfo().then(data => {
+        setUser(data);
+        setModalState(false);
+        return data;
+      }, error => {
+        console.error("login failed", error)
+      });
+    });
   }
 
   function handleLogout() {
@@ -139,7 +144,7 @@ function NavbarUserSection({user, setUser}) {
         <button className="button" onClick={()=>setModalState(true)}>Log In</button>
       </div>
       {modalState ? <LoginModal setModalState={setModalState} handleLogin={handleLogin}/> : ""}
-    </>)
+    </>);
   else return (<>
     <div className="navbar-item">
       <p>Hello, {user.name}!</p>
@@ -147,7 +152,323 @@ function NavbarUserSection({user, setUser}) {
     <div className="navbar-item">
       <button className="button" onClick={handleLogout}>Log Out</button>
     </div>
-  </>)
+  </>);
+}
+
+
+function NotLoggedInHome() {
+  return (
+    <section className="hero is-primary is-fullheight-with-navbar">
+      <div className="hero-body">
+        <div className="container has-text-centered">
+          <p className="title">KokoMemo</p>
+          <p className="subtitle">
+            Like A Cubicle Wall, Next To Your Desk.
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+
+function EditMemoModal({id, wallId, content, setContent, setIsDeleted, setModalState}) {
+  function handleSubmit(event) {
+    const submitter = event.nativeEvent.submitter.name;
+    const content = event.target.content.value
+
+    event.preventDefault();
+    
+    if (submitter == "submit") {
+      request("put", `/walls/${wallId}/memos`, {
+        id: id,
+        content: content
+      }).then(resp => {
+        setContent(content);
+        setModalState(false);
+      });
+    } else if (submitter == "delete") {
+      request("delete", `/walls/${wallId}/memos/${id}`).then(resp => {
+        setIsDeleted(true);
+        setModalState(false);
+      });
+    }
+  }
+
+  return (
+    <div className="modal is-active">
+      <div className="modal-background" onClick={()=>setModalState(false)}></div>
+      <div className="modal-content">
+        <form className="box" onSubmit={handleSubmit}>
+          <h1 className="title has-text-centered">Edit Memo</h1>
+          <div className="field">
+            <label className="label">Content</label>
+            <textarea className="textarea" name="content"
+                      defaultValue={content}
+                      rows="15" style={{backgroundColor: "#feff9c", color: "#000000"}}> 
+            </textarea>
+          </div>
+          <div className="field is-grouped is-flex is-justify-content-flex-end">
+            <button name="delete" className="button is-danger">Delete</button>
+            <button name="submit" className="button">Submit</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+
+function Memo({id, wallId, initialContent}) {
+  const [modalState, setModalState] = useState(false);
+  const [isDeleted, setIsDeleted] = useState(false);
+  const [content, setContent] = useState(initialContent);
+
+  if (isDeleted) return (<></>);
+
+  return (
+    <div className="box" style={{backgroundColor: "#feff9c"}} onClick={()=>setModalState(true)}>
+      <p style={{color: "#000000", whiteSpace: "pre-wrap"}}>
+        {content}
+      </p>
+      { modalState ?
+        <EditMemoModal id={id}
+                       wallId={wallId}
+                       content={content}
+                       setContent={setContent}
+                       setIsDeleted={setIsDeleted}
+                       setModalState={setModalState}/>
+        : ""
+      }
+    </div>
+  )
+}
+
+
+function NewMemoModal({wallId, setMemos, setModalState}) {
+  function handleSubmit(event) {
+    const content = event.target.content.value
+
+    event.preventDefault();
+    
+    request("post", `/walls/${wallId}/memos`, {
+      content: content
+    }).then(resp => {
+      const newMemo = resp.data.data;
+      setMemos(memos => [newMemo, ...memos]);
+      setModalState(false);
+    });
+  }
+
+  return (
+    <div className="modal is-active">
+      <div className="modal-background" onClick={()=>setModalState(false)}></div>
+      <div className="modal-content">
+        <form className="box" onSubmit={handleSubmit}>
+          <h1 className="title has-text-centered">New Memo</h1>
+          <div className="field">
+            <label className="label">Content</label>
+            <textarea className="textarea" name="content"
+                      defaultValue="Write a simple memo like this is a sticky note!"
+                      rows="15" style={{backgroundColor: "#feff9c", color: "#000000"}}> 
+            </textarea>
+          </div>
+          <div className="field is-grouped is-flex is-justify-content-flex-end">
+            <button name="submit" className="button">Submit</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+
+function EditWallModal(
+  {id, setModalState, name, setName, colour, setColour, setIsDeleted}
+) {
+  function handleSubmit(event) {
+    const name = event.target.name.value
+    const colour = event.target.colour.value
+    const colourNum = Number(colour.replace("#", "0x"))
+    const submitter = event.nativeEvent.submitter.name;
+
+    event.preventDefault();
+    
+    if (submitter == "submit") {
+      request("put", "/walls/", {
+        id: id,
+        name: name,
+        colour: colourNum
+      }).then(resp => {
+        setName(name);
+        setColour(colour);
+        setModalState(false);
+      });
+    } else if (submitter == "delete") {
+      request("delete", `/walls/${id}`).then(() => {
+        setIsDeleted(true);
+      });
+    }
+  }
+
+  return (
+    <div className="modal is-active">
+      <div className="modal-background" onClick={()=>setModalState(false)}></div>
+      <div className="modal-content">
+        <form className="box" onSubmit={handleSubmit}>
+          <h1 className="title has-text-centered">Edit Wall</h1>
+          <div className="field">
+            <label className="label">Wall name</label>
+            <input className="input" name="name" defaultValue={name} type="text" />
+          </div>
+          <div className="field">
+            <label className="label">Wall colour</label>
+            <input className="input" name="colour" type="color" defaultValue={colour} />
+          </div>
+          <div className="field is-grouped is-flex is-justify-content-flex-end">
+            <button name="delete" className="button is-danger">Delete</button>
+            <button name="submit" className="button">Submit</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+
+function Wall({id, initialName, initialColour}) {
+  const [memos, setMemos] = useState(null);
+  const [name, setName] = useState(initialName);
+  const [colour, setColour] = useState(
+    `#${initialColour.toString(16).padStart(6, '0')}`
+  )
+  const [wallModalState, setWallModalState] = useState(false);
+  const [memoModalState, setMemoModalState] = useState(false);
+  const [isDeleted, setIsDeleted] = useState(false);
+
+  if (isDeleted) return (<></>);
+
+  if (memos === null) {
+    request("get", `/walls/${id}/memos`).then(resp => {
+      setMemos(resp.data.data);
+    });
+  }
+
+  return (
+    <div className="box" style={{backgroundColor: colour}}>
+      <div className="is-flex is-justify-content-space-between">
+        <button className="button is-invisible">Edit</button>
+        <h1 className="title">{name}</h1>
+        <div>
+          <button className="button is-primary" onClick={()=>setWallModalState(true)}>
+            Edit
+          </button>
+        </div>
+      </div>
+      <div style={{marginRight: '33%', marginLeft: '33%'}}>
+        <div className="block">
+          <button className="button is-primary is-fullwidth" onClick={()=>setMemoModalState(true)}>New memo</button>
+        </div>
+        { memos !== null ?
+          memos.map(memo =>
+            <Memo id={memo.id} wallId={id} initialContent={memo.content} key={memo.id}/>
+          ) : "" 
+        }
+      </div>
+      { wallModalState ?
+        <EditWallModal setModalState={setWallModalState}
+                       setName={setName} 
+                       setColour={setColour}
+                       setIsDeleted={setIsDeleted}
+                       id={id}
+                       name={name}
+                       colour={colour}/>
+        : ""
+      }
+      { memoModalState ?
+        <NewMemoModal wallId={id}
+                      setMemos={setMemos}
+                      setModalState={setMemoModalState}/>
+        : ""
+      }
+    </div>
+  )
+}
+
+
+function NewWallModal({setModalState, setWalls}) {
+  function handleSubmit(event) {
+    event.preventDefault()
+    const name = event.target.name.value;
+    const colour = Number(event.target.colour.value.replace("#", "0x"));
+
+    request("post", "/walls", {"name": name, "colour": colour}).then(resp => {
+      const newWall = resp.data.data;
+
+      setWalls(walls=>[newWall, ...walls]);
+      setModalState(false);
+    });
+  }
+
+  return (
+    <div className="modal is-active">
+      <div className="modal-background" onClick={()=>setModalState(false)}></div>
+      <div className="modal-content">
+        <form className="box" onSubmit={handleSubmit}>
+          <h1 className="title has-text-centered">New Wall</h1>
+          <div className="field">
+            <label className="label">Wall name</label>
+            <input className="input" name="name" type="text" />
+          </div>
+          <div className="field">
+            <label className="label">Wall colour</label>
+            <input className="input" name="colour" type="color" defaultValue="#b5c9d4" />
+          </div>
+          <div className="field is-flex is-justify-content-flex-end">
+            <button className="button">Submit</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+
+function MainHome() {
+  const [walls, setWalls] = useState(null);
+  const [modalState, setModalState] = useState(false);
+
+  if (walls === null) {
+    request("get", "/walls").then(resp => {
+      setWalls(resp.data.data);
+    });
+  }
+
+  return (
+    <section className="px-2 container">
+      <div className="py-4 is-flex is-justify-content-space-between">
+        <h1 className="title mb-0">Walls</h1>
+        <div>
+          <button className="button is-primary"
+                  onClick={()=>{setModalState(true)}}>
+            New Wall
+          </button>
+        </div>
+      </div>
+      { walls !== null ?
+        walls.map(wall =>
+          <Wall id={wall.id}
+                initialName={wall.name}
+                initialColour={wall.colour}
+                key={wall.id}/>
+        ) : ""
+      }
+    { modalState ?
+      <NewWallModal setModalState={setModalState} setWalls={setWalls}/>
+      : "" 
+    }
+    </section>
+  )
 }
 
 
@@ -187,16 +508,7 @@ function App() {
           </div>
         </div>
       </nav>
-      { user === null ?
-        <section className="hero is-primary is-fullheight-with-navbar">
-          <div className="hero-body">
-          </div>
-        </section> :
-        <section className="container hero is-fullheight-with-navbar">
-          <h1 className="title">You've entered the secret society of the pigeon milkers</h1>
-          <p>{JSON.stringify(user)}</p>
-        </section>
-      }
+      { user === null ? <NotLoggedInHome/> : <MainHome/>}
     </>
   )
 }
