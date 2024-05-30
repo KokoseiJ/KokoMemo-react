@@ -39,14 +39,14 @@ function refresh() {
   const rt = localStorage.getItem("rt");
   
   if (currentTokenRefresh !== null)
-    return Promise.resolve(currentTokenRefresh);
+    return currentTokenRefresh;
 
   currentTokenRefresh = client.post(
     "/user/login/token/refresh", {token: rt}
   ).then(respData => {
     let data = respData.data.data
     handleToken(data.access_token, data.refresh_token)
-    currentTokenRefresh = false;
+    currentTokenRefresh = null;
     return data
   }, error => {
     console.error("refresh failed", error);
