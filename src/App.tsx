@@ -267,10 +267,12 @@ function Memo({id, wallId, initialContent}: Props) {
   if (isDeleted) return (<></>);
 
   return (<>
-    <div className="box" style={{backgroundColor: "#feff9c"}} onClick={()=>setModalState(true)}>
-      <p style={{color: "#000000", whiteSpace: "pre-wrap"}}>
-        {content}
-      </p>
+    <div className="block is-flex is-justify-content-center">
+      <div className="box" style={{backgroundColor: "#feff9c"}} onClick={()=>setModalState(true)}>
+        <p style={{color: "#000000", whiteSpace: "pre-wrap"}}>
+          {content}
+        </p>
+      </div>
     </div>
     { modalState ?
       <EditMemoModal id={id}
@@ -422,9 +424,9 @@ function Wall({id, initialName, initialColour}: Props) {
           </button>
         </div>
       </a>
-      <div id={`collapsible-${id}`} className="is-collapsible" style={{marginRight: '33%', marginLeft: '33%'}}>
-        <div className="block">
-          <button className="button is-primary is-fullwidth" onClick={()=>setMemoModalState(true)}>New memo</button>
+      <div id={`collapsible-${id}`} className="is-collapsible">
+        <div className="block is-flex is-justify-content-center">
+          <button className="button is-primary" onClick={()=>setMemoModalState(true)}>New memo</button>
         </div>
         { memos !== null ?
           memos.map((memo: Memo) =>
