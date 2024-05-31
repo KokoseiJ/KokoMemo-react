@@ -172,7 +172,7 @@ function NavbarUserSection({user, setUser}:Props) {
     })
   }
 
-  if (user === null)
+  if (!user)
     return (<>
       <div className="navbar-item">
         <button className="button" onClick={()=>setModalState(true)}>Log In</button>
@@ -552,28 +552,31 @@ function App() {
   let at = localStorage.getItem("at");
   let rt = localStorage.getItem("rt");
 
-  if (user === null && at !== null && rt !== null) {
-    console.log(user, at)
-    handleToken(at, rt);
-    getUserInfo().then(
-      data => {
-        setUser(data);
-        console.log("meow");
-      },
-      error => {
-        console.error("Stored session is invalid", error);
-        wipeToken();
-        setUser(false);
-      }
-    );
+  if (user === null) {
+    if (at !== null && rt !== null) {
+      console.log(user, at)
+      handleToken(at, rt);
+      getUserInfo().then(
+        data => {
+          setUser(data);
+          console.log("meow");
+        },
+        error => {
+          console.error("Stored session is invalid", error);
+          wipeToken();
+          setUser(false);
+        }
+      );
+    } else {
+      setUser(false);
+    }
   }
-  setUser(false);
 
   let home;
 
   if (user === null) home = (<LoadLogInHome/>);
   else if (user === false) home = (<NotLoggedInHome/>);
-  else if (user === true) home = (<MainnHome/>);
+  else home = (<MainHome/>);
 
   return (
     <>
