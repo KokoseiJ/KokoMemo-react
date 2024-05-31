@@ -85,7 +85,7 @@ function refresh(): Promise<object> {
     console.error("refresh failed", error);
     alert("You have been logged out, plaese sign in again.")
     wipeToken();
-    setUser(null);
+    setUser(false);
     throw error;
   });
 
@@ -188,6 +188,20 @@ function NavbarUserSection({user, setUser}:Props) {
     </div>
   </>);
 }
+
+
+function LoadLogInHome() {
+  return (
+    <section className="hero is-fullheight-with-navbar">
+      <div className="hero-body">
+        <div className="container has-text-centered">
+          <p className="title">Loading...</p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 
 
 function NotLoggedInHome() {
@@ -549,9 +563,17 @@ function App() {
       error => {
         console.error("Stored session is invalid", error);
         wipeToken();
+        setUser(false);
       }
     );
   }
+  setUser(false);
+
+  let home;
+
+  if (user === null) home = (<LoadLogInHome/>);
+  else if (user === false) home = (<NotLoggedInHome/>);
+  else if (user === true) home = (<MainnHome/>);
 
   return (
     <>
@@ -567,7 +589,7 @@ function App() {
           </div>
         </div>
       </nav>
-      { user === null ? <NotLoggedInHome/> : <MainHome/>}
+      { home }
     </>
   )
 }
