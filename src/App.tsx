@@ -111,7 +111,7 @@ function request(method: string, path: string, data: object | null = null): Prom
             console.log("refresh successful, retrying request");
             return request(method, path, data);
           },
-          (error) => {console.log("gay", error); throw error;}
+          (error) => {console.log("AGGA", error); throw error;}
         );
       }
       throw error;
